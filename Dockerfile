@@ -2,10 +2,10 @@
 # CUDA 13 devel base (FreeToken needs r580+ driver / CUDA 13 toolkit for JIT kernels)
 FROM nvidia/cuda:13.0.1-devel-ubuntu24.04
 
-# python3.12 + git + curl + uv (git needed for source install of FreeToken)
+# python3.12 + git + curl + uv (git needed for source install; python3.12-dev for C++ extension builds)
 RUN apt-get update && \
     apt-get install -yq --no-install-recommends \
-      ca-certificates git curl python3.12 python3.12-venv python3-pip && \
+      ca-certificates git curl python3.12 python3.12-dev python3.12-venv python3-pip && \
     rm -rf /var/lib/apt/lists/*
 
 # Install uv (standalone; also gives python management)
