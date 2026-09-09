@@ -2,12 +2,13 @@
 # CUDA 13 devel base (FreeToken needs r580+ driver / CUDA 13 toolkit for JIT kernels)
 FROM nvidia/cuda:13.0.1-devel-ubuntu24.04
 
+# python3.12 + git + curl + uv (git needed for source install of FreeToken)
 RUN apt-get update && \
     apt-get install -yq --no-install-recommends \
-      ca-certificates python3.12 python3.12-venv python3-pip curl git uv && \
-    rm -rf /var/lib/apt/lists/* || true
+      ca-certificates git curl python3.12 python3.12-venv python3-pip && \
+    rm -rf /var/lib/apt/lists/*
 
-# uv via standalone installer (Ubuntu 24.04 repos may lack the uv package)
+# Install uv (standalone; also gives python management)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
     ln -s /root/.local/bin/uv /usr/local/bin/uv && \
     ln -s /root/.local/bin/uvx /usr/local/bin/uvx
@@ -16,11 +17,10 @@ WORKDIR /app
 # Install FreeToken from source (CLI `ft`)
 RUN git clone --depth 1 https://github.com/FlashML-org/FreeToken.git /app/FreeToken && \
     cd /app/FreeToken && \
-    uv venv .venv && \
+    uv venv .venv --python python3.12 && \
     VIRTUAL_ENV=/app/FreeToken/.venv uv pip install -e ".[accel]"
 
 ENV PATH="/app/FreeToken/.venv/bin:${PATH}"
-ENV HF_HOME=/home/perryh/.cache/huggingface
 
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
