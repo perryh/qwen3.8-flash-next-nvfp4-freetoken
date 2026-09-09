@@ -20,7 +20,7 @@ services:
       - PORT=1919
       - HOST=0.0.0.0
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-      - EXTRA_ARGS=${EXTRA_ARGS:---num-tokens 262144 --moe-cache-size 4500}
+      - EXTRA_ARGS=${EXTRA_ARGS:---num-tokens 262144 --moe-cache-size 3600}
 
     deploy:
       resources:

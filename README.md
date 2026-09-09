@@ -68,7 +68,7 @@ Notes:
   capture time), so far fewer expert reads stream from DDR4 than ik_llama's
   offload-everything layout.
 - The tradeoff is context: FreeToken's auto-sizing left only ~8.2K KV tokens.
-  Raise it with `--num-tokens` / shrink `--moe-cache-rate` — every KV token
+  Raise it with `--num-tokens` + `--moe-cache-size` (see below) — every KV token
   costs 25,344 bytes, and it comes directly out of the expert cache.
 - Thinking mode is on by default (reasoning_content separated); 5950X Zen 3
   needs no special flags here — FreeToken handles kernel selection.
@@ -81,3 +81,15 @@ Notes:
 - `entrypoint.sh` — `ft serve` args from env knobs (defaults to `--memory-ratio 1`)
 - `run.sh` — one-command start/test/logs/stop wrapper
 - `bench_final.py` — decode/prefill/long-ctx benchmark (results above)
+
+
+## Full-context mode (verified working)
+
+`EXTRA_ARGS=--num-tokens 262144 --moe-cache-size 4300` (use 3600 if it OOMs
+under load) serves the **full 262,144-token window** on the 32GB card:
+KV 6.19GB + mamba 2.64GB + 30.9GB total VRAM. Trade: expert cache drops
+5,925 -> ~4,300, decode falls 48 -> ~22 tok/s; prefill stays fast
+(~1,600 tok/s @ 14.5K measured). Boot smoke passes at 4,500 but the backend
+crashes ~100-160MB short under real load — give it margin.
+
+Default (no flags beyond `--num-tokens 16384`) = fast mode: 16K ctx, ~48 tok/s.
