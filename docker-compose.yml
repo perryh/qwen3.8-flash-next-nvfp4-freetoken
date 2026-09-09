@@ -19,7 +19,8 @@ services:
       - MODEL_PATH=/models/Qwen3.8-Flash-Next-NVFP4
       - PORT=1919
       - HOST=0.0.0.0
-      - EXTRA_ARGS=${EXTRA_ARGS:---num-tokens 16384}
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+      - EXTRA_ARGS=${EXTRA_ARGS:---num-tokens 262144 --moe-cache-size 4500}
 
     deploy:
       resources:
