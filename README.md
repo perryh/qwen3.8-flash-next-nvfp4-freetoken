@@ -26,8 +26,9 @@ OpenAI + Anthropic compatible APIs on port 1919.
 Server: `http://localhost:1919` — OpenAI (`/v1/chat/completions`,
 `/v1/models`, `/v1/responses`) and Anthropic (`/v1/messages`) APIs.
 
-First start JIT-compiles CUDA kernels and may convert the checkpoint to
-FreeToken's FTW fast-load format — give it several minutes.
+First start JIT-compiles CUDA kernels — give it several minutes. Model load
+after image warm: ~2 minutes to ready (weights 29.3 GiB of the 32 GiB card
+with `--memory-ratio 1`).
 
 ### Knobs (env / `.env`)
 
@@ -35,29 +36,48 @@ FreeToken's FTW fast-load format — give it several minutes.
 |---|---|---|
 | `PORT` | `1919` | host port |
 | `MODEL_DIR` | `~/.freetoken/models/Qwen3.8-Flash-Next-NVFP4` | host path to the checkpoint |
-| `EXTRA_ARGS` | *(empty)* | extra `ft serve` flags, e.g. `"--moe-strategy hybrid --moe-cache-rate 0.6"` |
+| `EXTRA_ARGS` | `--memory-ratio 1` | extra `ft serve` flags |
 | `GPU_DEVICE_ID` | `0` | GPU pin |
 
 Useful `ft serve` flags (pass via `EXTRA_ARGS`):
-- `--moe-strategy {auto,fused,offload,cpu,hybrid}` — expert placement (auto = offload, or hybrid with a bandwidth profile)
-- `--moe-cache-rate 0.6` — GPU expert-cache fraction
+- `--num-tokens N` — raise KV capacity (default auto-sized; ~8.2K tokens with
+  memory-ratio 1 on the 32GB card because the GPU expert cache takes priority)
+- `--moe-cache-rate 0.5` — shrink GPU expert cache to free VRAM for KV
 - `--quant-backend moe.nvfp4=b12x` — NVFP4 kernel selection (marlin/b12x/triton)
-- `--max-running-requests N`, `--max-seq-len-override N`
-- `ft bench bw` inside the container calibrates the auto strategy (writes a per-GPU profile)
+- `ft bench bw` inside the container calibrates the auto MoE strategy
 
-## Notes
+## Benchmark
 
-- FreeToken resolves dtype/backends/cache sizes automatically from the
-  checkpoint + GPU; the NVFP4 experts are detected and an appropriate kernel
-  backend is picked. First-use kernel JIT needs the CUDA 13 toolkit — included
-  in the build image.
-- The container runs `ft serve` from a source checkout of
-  FlashML-org/FreeToken (pinned by the Docker build).
-- SELinux: model volume is mounted `:ro,Z` (relabel is metadata-only).
+`bench_final.py` — pure-decode, prefill (4K/8K), and long-context generation.
+Measured 2026-09-09 on this repo's defaults (`--memory-ratio 1`):
+
+| metric | FreeToken (NVFP4) | ik_llama MTP (MXFP4) * |
+|---|---|---|
+| decode (prose) | **~48 tok/s** | ~21 tok/s |
+| decode w/ long ctx (8K) | ~53 tok/s | ~21 tok/s |
+| prefill @ 4.6K | 1,900 tok/s | ~300 tok/s |
+| prefill @ 8.1K | **3,300 tok/s** | ~300 tok/s |
+| KV context budget | ~8.2K tokens (default) | 262,144 tokens |
+
+\* ik_llama numbers from its repo README, measured on the same machine
+(5950X dual-channel DDR4, q8 KV, spec decode ngram+MTP).
+
+Notes:
+- FreeToken wins raw speed ~2x on decode and ~6-10x on prefill: the NVFP4
+  experts mostly live in a 19.5GB GPU cache (LRU, 5,925 slots cached at
+  capture time), so far fewer expert reads stream from DDR4 than ik_llama's
+  offload-everything layout.
+- The tradeoff is context: FreeToken's auto-sizing left only ~8.2K KV tokens.
+  Raise it with `--num-tokens` / shrink `--moe-cache-rate` — every KV token
+  costs 25,344 bytes, and it comes directly out of the expert cache.
+- Thinking mode is on by default (reasoning_content separated); 5950X Zen 3
+  needs no special flags here — FreeToken handles kernel selection.
 
 ## Files
 
-- `Dockerfile` — CUDA 13 devel + uv + FreeToken source install (`[accel]` extra)
+- `Dockerfile` — CUDA 13 devel + uv + FreeToken source install (`[accel]`;
+  git + python3.12-dev required: source build compiles a torch C++ extension)
 - `docker-compose.yml` — port, `:ro,Z` model volume, GPU reservation, restart policy
-- `entrypoint.sh` — assembles `ft serve` args from env knobs
+- `entrypoint.sh` — `ft serve` args from env knobs (defaults to `--memory-ratio 1`)
 - `run.sh` — one-command start/test/logs/stop wrapper
+- `bench_final.py` — decode/prefill/long-ctx benchmark (results above)
