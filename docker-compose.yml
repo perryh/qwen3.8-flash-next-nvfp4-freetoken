@@ -1,0 +1,32 @@
+services:
+  freetoken:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: freetoken-qwen38-nvfp4:latest
+    container_name: freetoken
+
+    ports:
+      - "${PORT:-1919}:1919"
+
+    volumes:
+      # NVFP4 model dir (host path -> container path)
+      - ${MODEL_DIR}:/models/Qwen3.8-Flash-Next-NVFP4:ro,Z
+      # HF cache (for any auxiliary downloads)
+      - ${HOME}/.cache/huggingface:/home/perryh/.cache/huggingface
+
+    environment:
+      - MODEL_PATH=/models/Qwen3.8-Flash-Next-NVFP4
+      - PORT=1919
+      - HOST=0.0.0.0
+      - EXTRA_ARGS=${EXTRA_ARGS:-}
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GPU_DEVICE_ID:-0}"]
+              capabilities: [gpu]
+
+    restart: unless-stopped
