@@ -19,7 +19,7 @@ services:
       - MODEL_PATH=/models/Qwen3.8-Flash-Next-NVFP4
       - PORT=1919
       - HOST=0.0.0.0
-      - EXTRA_ARGS=${EXTRA_ARGS:---memory-ratio 1 --num-tokens 32768}
+      - EXTRA_ARGS=${EXTRA_ARGS:---memory-ratio 1}
 
     deploy:
       resources:
