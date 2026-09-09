@@ -6,7 +6,7 @@ set -euo pipefail
 MODEL_PATH="${MODEL_PATH:-/models/Qwen3.8-Flash-Next-NVFP4}"
 HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-1919}"
-EXTRA_ARGS="${EXTRA_ARGS:-}"
+EXTRA_ARGS="${EXTRA_ARGS:---memory-ratio 1}"
 
 ARGS=(serve --model "$MODEL_PATH" --host "$HOST" --port "$PORT")
 
